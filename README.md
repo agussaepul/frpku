@@ -1,4 +1,4 @@
-link github RDP NEW: https://drive.google.com/file/d/16Ihz0woLvteWeXiyD-Qw9OKuwfPIlwlZ/view?usp=sharing
+link github RDP NEW: https://github.com/frpku/mbahgadget
 
 jANGAN LUPA LIKE DAN SUBSCRIBE CHANNEL KAMI MBAH GADGET
 
