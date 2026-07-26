@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Studio Hub</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">🧩 AI Studio Hub</div>
+      <nav class="tabs">
+        <button class="tab active" data-tab="chat">💬 Chat</button>
+        <button class="tab" data-tab="prompt">📝 Prompt</button>
+        <button class="tab" data-tab="image">🖼️ Gambar</button>
+        <button class="tab" data-tab="edit">🎨 Ubah</button>
+        <button class="tab" data-tab="analyze">🔍 Analisa</button>
+        <button class="tab" data-tab="i2v">🎞️ Foto→Video</button>
+        <button class="tab" data-tab="video">🎬 Video</button>
+      </nav>
+    </header>
+
+    <main class="wrap">
+      <!-- ========== CHAT ========== -->
+      <section class="view active" id="view-chat">
+        <div class="panel">
+          <div class="chat-head">
+            <h2>Chat multi-AI</h2>
+            <select id="chatProvider" class="pill"></select>
+          </div>
+          <div id="chatThread" class="thread">
+            <div class="bubble ai">Halo! Pilih AI di kanan atas lalu mulai ngobrol. Semua dalam satu tempat 🚀</div>
+          </div>
+          <form id="chatForm" class="composer">
+            <input id="chatInput" placeholder="Tulis pesan…" autocomplete="off" />
+            <button class="primary" type="submit">Kirim</button>
+          </form>
+        </div>
+      </section>
+
+      <!-- ========== PROMPT ========== -->
+      <section class="view" id="view-prompt">
+        <div class="panel">
+          <h2>Generator prompt (gambar & image-to-video)</h2>
+          <p class="hint">Masukkan idenya, dapatkan prompt siap tempel untuk generate gambar lalu mengubahnya jadi video.</p>
+          <label>Ide / deskripsi
+            <textarea id="promptIdea" rows="3" placeholder="Contoh: astronaut duduk santai di kafe di bulan"></textarea>
+          </label>
+          <button id="promptBtn" class="primary">✨ Buatkan prompt</button>
+          <div id="promptOut" class="prompt-out hidden">
+            <div class="prompt-card">
+              <div class="prompt-card-head"><span>🖼️ Prompt gambar (text-to-image)</span><button class="ghost copy" data-target="pImage">Salin</button></div>
+              <p id="pImage"></p>
+            </div>
+            <div class="prompt-card">
+              <div class="prompt-card-head"><span>🎥 Prompt image-to-video</span><button class="ghost copy" data-target="pVideo">Salin</button></div>
+              <p id="pVideo"></p>
+            </div>
+            <div class="prompt-card">
+              <div class="prompt-card-head"><span>🚫 Negative prompt</span><button class="ghost copy" data-target="pNeg">Salin</button></div>
+              <p id="pNeg"></p>
+            </div>
+            <button id="sendToImage" class="ghost full">➡️ Kirim prompt gambar ke Studio Gambar</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== GAMBAR ========== -->
+      <section class="view" id="view-image">
+        <div class="panel">
+          <h2>Studio gambar (text-to-image)</h2>
+          <label>Prompt gambar
+            <textarea id="imgPrompt" rows="3" placeholder="Deskripsikan gambar yang kamu mau…"></textarea>
+          </label>
+          <button id="imgBtn" class="primary">🖼️ Generate gambar</button>
+          <p id="imgMsg" class="msg"></p>
+          <div class="img-stage">
+            <img id="imgResult" alt="hasil gambar" />
+            <div id="imgEmpty" class="stage-empty">Gambar akan muncul di sini</div>
+          </div>
+          <div class="controls" id="imgActions" style="display:none">
+            <a id="imgDownload" class="btnlink" download="gambar-ai.png">⬇️ Unduh gambar</a>
+            <button id="imgToVideo" class="ghost">🎬 Jadikan latar video</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== UBAH (image-to-image) ========== -->
+      <section class="view" id="view-edit">
+        <div class="panel">
+          <h2>Ubah gambar (image-to-image)</h2>
+          <p class="hint">Unggah gambar, pilih gaya (atau tulis prompt), lalu ubah tampilannya.</p>
+          <input type="file" id="editFile" accept="image/*" />
+          <div class="style-row">
+            <button class="chip" data-style="sinematik">🎬 Sinematik</button>
+            <button class="chip" data-style="vintage">📷 Vintage</button>
+            <button class="chip" data-style="neon">🌈 Neon</button>
+            <button class="chip" data-style="bw">⚫ Hitam-Putih</button>
+            <button class="chip" data-style="hangat">🔥 Hangat</button>
+            <button class="chip" data-style="dingin">❄️ Dingin</button>
+          </div>
+          <label>Prompt (dipakai jika ada API key)
+            <input id="editPrompt" placeholder="Contoh: ubah jadi lukisan cat air" />
+          </label>
+          <p id="editMsg" class="msg"></p>
+          <div class="dual">
+            <div class="img-stage"><img id="editSrc" alt="asli" /><div class="stage-empty" id="editEmpty">Gambar asli</div></div>
+            <div class="img-stage"><img id="editOut" alt="hasil" /><div class="stage-empty">Hasil</div></div>
+          </div>
+          <div class="controls" id="editActions" style="display:none">
+            <a id="editDownload" class="btnlink" download="gambar-ubah.png">⬇️ Unduh hasil</a>
+            <button id="editToVideo" class="ghost">🎞️ Jadikan video</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== ANALISA (breakdown image) ========== -->
+      <section class="view" id="view-analyze">
+        <div class="panel">
+          <h2>Breakdown / analisa gambar</h2>
+          <p class="hint">Unggah gambar untuk dapat deskripsi, palet warna, dan prompt siap pakai.</p>
+          <input type="file" id="anaFile" accept="image/*" />
+          <p id="anaMsg" class="msg"></p>
+          <div class="img-stage" style="max-width:280px"><img id="anaImg" alt="gambar" /><div class="stage-empty" id="anaEmpty">Gambar</div></div>
+          <div id="anaOut" class="hidden">
+            <div class="prompt-card"><div class="prompt-card-head"><span>📄 Deskripsi</span></div><p id="anaDesc"></p></div>
+            <div class="prompt-card"><div class="prompt-card-head"><span>🎨 Palet warna</span></div><div id="anaPalette" class="palette"></div></div>
+            <div class="prompt-card"><div class="prompt-card-head"><span>🏷️ Elemen / mood</span></div><p id="anaElements"></p></div>
+            <div class="prompt-card"><div class="prompt-card-head"><span>🖼️ Prompt gambar</span><button class="ghost copy" data-target="anaImgPrompt">Salin</button></div><p id="anaImgPrompt"></p></div>
+            <div class="prompt-card"><div class="prompt-card-head"><span>🎥 Prompt video</span><button class="ghost copy" data-target="anaVidPrompt">Salin</button></div><p id="anaVidPrompt"></p></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== FOTO → VIDEO (image-to-video) ========== -->
+      <section class="view" id="view-i2v">
+        <div class="panel">
+          <h2>Foto → Video (image-to-video)</h2>
+          <p class="hint">Ubah satu foto jadi video bergerak (efek kamera) dan unduh sebagai .webm.</p>
+          <input type="file" id="i2vFile" accept="image/*" />
+          <div class="row">
+            <label>Gerakan
+              <select id="i2vMotion">
+                <option value="zoomin">Zoom in</option>
+                <option value="zoomout">Zoom out</option>
+                <option value="panright">Geser kanan</option>
+                <option value="panleft">Geser kiri</option>
+                <option value="kenburns">Ken Burns (zoom+geser)</option>
+              </select>
+            </label>
+            <label>Durasi (detik)
+              <input id="i2vDur" type="number" min="2" max="10" value="5" />
+            </label>
+          </div>
+          <label class="voice-toggle" style="margin-bottom:12px"><input type="checkbox" id="i2vMusic" checked /> pakai musik latar</label>
+          <p id="i2vMsg" class="msg"></p>
+          <div class="stage" style="aspect-ratio:1/1; max-height:360px">
+            <canvas id="i2vCanvas" width="1080" height="1080"></canvas>
+            <div id="i2vEmpty" class="stage-empty">Unggah foto dulu</div>
+          </div>
+          <div class="controls">
+            <button id="i2vPreview" disabled>▶️ Preview</button>
+            <button id="i2vRecord" disabled>⏺️ Buat & unduh video</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== VIDEO ========== -->
+      <section class="view" id="view-video">
+        <div class="layout2">
+          <div class="panel">
+            <h2>Studio video</h2>
+            <label>Topik / ide video
+              <textarea id="topic" rows="3" placeholder="Contoh: 3 cara pakai AI untuk belajar lebih cepat"></textarea>
+            </label>
+            <label>Platform
+              <select id="platform">
+                <option>TikTok / Reels</option>
+                <option>YouTube Shorts</option>
+                <option>Instagram Feed</option>
+                <option>YouTube (landscape)</option>
+              </select>
+            </label>
+            <div class="row">
+              <label>Bahasa
+                <select id="language"><option>Indonesia</option><option>English</option></select>
+              </label>
+              <label>Jumlah scene
+                <input id="sceneCount" type="number" min="2" max="8" value="4" />
+              </label>
+            </div>
+            <label>Gaya / tone
+              <input id="tone" type="text" value="santai & informatif" />
+            </label>
+            <button id="generateBtn" class="primary">✨ Buat rencana video</button>
+            <p id="msg" class="msg"></p>
+            <div id="planMeta" class="plan-meta hidden">
+              <h3 id="planTitle"></h3>
+              <p id="planHook" class="hook"></p>
+              <div class="caption-box">
+                <strong>Caption:</strong><p id="planCaption"></p>
+                <div id="planHashtags" class="hashtags"></div>
+                <button id="copyCaption" class="ghost">📋 Salin caption + hashtag</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <h2>Preview & unduh</h2>
+            <div class="stage">
+              <canvas id="canvas" width="1080" height="1920"></canvas>
+              <div id="stageEmpty" class="stage-empty">Buat rencana video dulu di kiri</div>
+            </div>
+            <div class="controls">
+              <button id="previewBtn" disabled>▶️ Preview (suara)</button>
+              <button id="recordBtn" disabled>⏺️ Buat & unduh video</button>
+              <label class="voice-toggle"><input type="checkbox" id="muteRecord" /> tanpa musik</label>
+            </div>
+            <p id="recordMsg" class="msg"></p>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="foot">
+      Semua provider bisa disambung lewat API key di <code>.env</code> · tanpa key = mode demo
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>
