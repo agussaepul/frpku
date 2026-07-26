@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="id">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>AI Video Generator</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">🎬 AI Video Generator</div>
+      <div id="aiStatus" class="badge">memeriksa…</div>
+    </header>
+
+    <main class="layout">
+      <!-- Panel kontrol -->
+      <section class="panel">
+        <h2>1. Isi ide kontenmu</h2>
+
+        <label>Topik / ide video
+          <textarea id="topic" rows="3" placeholder="Contoh: 3 cara pakai AI untuk belajar lebih cepat"></textarea>
+        </label>
+
+        <label>Platform
+          <select id="platform">
+            <option>TikTok / Reels</option>
+            <option>YouTube Shorts</option>
+            <option>Instagram Feed</option>
+            <option>YouTube (landscape)</option>
+          </select>
+        </label>
+
+        <div class="row">
+          <label>Bahasa
+            <select id="language">
+              <option>Indonesia</option>
+              <option>English</option>
+            </select>
+          </label>
+          <label>Jumlah scene
+            <input id="sceneCount" type="number" min="2" max="8" value="4" />
+          </label>
+        </div>
+
+        <label>Gaya / tone
+          <input id="tone" type="text" value="santai & informatif" />
+        </label>
+
+        <button id="generateBtn" class="primary">✨ Buat rencana video</button>
+        <p id="msg" class="msg"></p>
+      </section>
+
+      <!-- Panel hasil + preview -->
+      <section class="panel">
+        <h2>2. Preview & buat video</h2>
+
+        <div class="stage">
+          <canvas id="canvas" width="1080" height="1920"></canvas>
+          <div id="stageEmpty" class="stage-empty">Rencana video akan muncul di sini</div>
+        </div>
+
+        <div class="controls">
+          <button id="previewBtn" disabled>▶️ Preview (dengan suara)</button>
+          <button id="recordBtn" disabled>⏺️ Buat & unduh video</button>
+          <label class="voice-toggle">
+            <input type="checkbox" id="muteRecord" /> rekam tanpa musik
+          </label>
+        </div>
+        <p id="recordMsg" class="msg"></p>
+
+        <div id="planMeta" class="plan-meta hidden">
+          <h3 id="planTitle"></h3>
+          <p id="planHook" class="hook"></p>
+          <div class="caption-box">
+            <strong>Caption:</strong>
+            <p id="planCaption"></p>
+            <div id="planHashtags" class="hashtags"></div>
+            <button id="copyCaption" class="ghost">📋 Salin caption + hashtag</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <footer class="foot">
+      Voiceover pakai suara bawaan browser · Video direkam langsung di perangkatmu (.webm)
+    </footer>
+
+    <script src="app.js"></script>
+  </body>
+</html>

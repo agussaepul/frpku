@@ -1,0 +1,163 @@
+:root {
+  --bg: #0b1120;
+  --panel: #131c31;
+  --panel-2: #1b2740;
+  --text: #e5edff;
+  --muted: #94a3b8;
+  --accent: #6366f1;
+  --accent-2: #22d3ee;
+  --danger: #f43f5e;
+  --border: #26324d;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  background: radial-gradient(1200px 600px at 80% -10%, #1e293b, var(--bg));
+  color: var(--text);
+  min-height: 100vh;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--border);
+}
+
+.brand { font-size: 20px; font-weight: 700; }
+
+.badge {
+  font-size: 12px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  color: var(--muted);
+}
+.badge.on { color: #86efac; border-color: #14532d; background: #052e16; }
+.badge.demo { color: #fcd34d; border-color: #78350f; background: #451a03; }
+
+.layout {
+  max-width: 1100px;
+  margin: 24px auto;
+  padding: 0 20px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 860px) {
+  .layout { grid-template-columns: 1fr; }
+}
+
+.panel {
+  background: linear-gradient(180deg, var(--panel), var(--panel-2));
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+}
+
+.panel h2 { margin: 0 0 16px; font-size: 16px; }
+
+label {
+  display: block;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 14px;
+}
+
+.row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+
+textarea, input, select {
+  width: 100%;
+  margin-top: 6px;
+  background: #0c1424;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: inherit;
+}
+textarea { resize: vertical; }
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  border-color: var(--accent);
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  border-radius: 10px;
+  padding: 11px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  font-family: inherit;
+  transition: transform .05s, opacity .2s;
+}
+button:active { transform: translateY(1px); }
+button:disabled { opacity: .45; cursor: not-allowed; }
+
+.primary {
+  width: 100%;
+  color: white;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+  margin-top: 4px;
+}
+.ghost {
+  background: transparent;
+  border: 1px solid var(--border);
+  color: var(--text);
+}
+
+.stage {
+  position: relative;
+  background: #000;
+  border-radius: 12px;
+  overflow: hidden;
+  aspect-ratio: 9 / 16;
+  max-height: 460px;
+  margin: 0 auto 14px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+#canvas { width: 100%; height: 100%; object-fit: contain; display: none; }
+.stage-empty { color: var(--muted); font-size: 14px; padding: 20px; text-align: center; }
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+.controls button { background: var(--panel-2); border: 1px solid var(--border); color: var(--text); }
+#recordBtn { background: linear-gradient(90deg, var(--accent), #a855f7); color: #fff; }
+.voice-toggle { display: flex; align-items: center; gap: 6px; margin: 0; color: var(--muted); }
+.voice-toggle input { width: auto; margin: 0; }
+
+.msg { font-size: 13px; color: var(--muted); min-height: 18px; margin: 10px 0 0; }
+.msg.error { color: var(--danger); }
+.msg.ok { color: #86efac; }
+
+.plan-meta { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 16px; }
+.plan-meta.hidden { display: none; }
+#planTitle { margin: 0 0 6px; font-size: 16px; }
+.hook { color: var(--accent-2); font-style: italic; margin: 0 0 12px; }
+.caption-box {
+  background: #0c1424;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 13px;
+}
+.caption-box p { margin: 6px 0; color: var(--text); }
+.hashtags { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.hashtags span { font-size: 12px; color: var(--accent-2); }
+#copyCaption { margin-top: 8px; }
+
+.foot { text-align: center; color: var(--muted); font-size: 12px; padding: 24px; }
