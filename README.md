@@ -1,49 +1,53 @@
-# 🎬 AI Video Generator
+# 🧩 AI Studio Hub
 
-Web app untuk membuat **konten video menggunakan AI**. Masukkan sebuah topik, dan AI (Claude) menyusun rencana video lengkap — judul, hook, scene per scene (narasi + teks layar + warna latar), caption, dan hashtag. Aplikasi lalu **merender video langsung di browser** dan bisa **diunduh sebagai file `.webm`** — tanpa perlu API video berbayar.
+Satu aplikasi web yang menggabungkan beberapa AI (Claude, ChatGPT, Gemini, Grok) dan alur pembuatan konten video dalam **satu antarmuka**. Terinspirasi dari kebiasaan bikin gambar + prompt di ChatGPT, lalu video di Flow/Grok — semuanya jadi satu tempat.
 
-## ✨ Fitur
+> **Penting (jujur):** Aplikasi ini **tidak menyalin** model Gemini/Grok/GPT/Claude. Ia adalah **hub** yang menyambung ke tiap AI lewat **API resmi masing-masing**. Setiap provider butuh **API key sendiri** dan umumnya berbayar per pemakaian. Tanpa key, semua fitur tetap bisa dicoba dalam **mode demo**.
 
-- **Otak AI (Claude)** menyusun rencana video terstruktur dari satu topik.
-- **Preview dengan voiceover** memakai suara bawaan browser (Text-to-Speech gratis).
-- **Rekam & unduh video** — Canvas + MediaRecorder membuat file video di perangkatmu.
-- **Musik latar** sederhana dibuat via WebAudio dan ikut terekam ke video.
-- **Caption + hashtag siap posting**, tinggal salin.
-- **Mendukung format** TikTok/Reels/Shorts (potret) dan YouTube (landscape).
-- **Mode demo** — jalan penuh tanpa API key (memakai contoh rencana).
+## ✨ Empat fitur dalam satu
 
-## 🚀 Cara menjalankan
+| Tab | Fungsi | Butuh key |
+|-----|--------|-----------|
+| 💬 **Chat** | Ngobrol dengan Claude / ChatGPT / Gemini / Grok, ganti-ganti dari satu tempat | opsional (demo tanpa key) |
+| 📝 **Prompt** | Bikin prompt **text-to-image** + **image-to-video** otomatis dari satu ide | opsional |
+| 🖼️ **Gambar** | Generate gambar dari teks | OpenAI (demo tanpa key) |
+| 🎬 **Video** | Dari topik → rencana video → render & unduh `.webm`; bisa pakai gambar hasil Studio Gambar sebagai latar | jalan penuh tanpa key |
+
+Alur kerjamu (gambar + prompt di ChatGPT → video di Flow/Grok) kini jadi tombol: **Prompt → Gambar → Jadikan latar video → Rekam**.
+
+## 🚀 Menjalankan
 
 ```bash
 npm install
-cp .env.example .env   # opsional: isi ANTHROPIC_API_KEY untuk AI sungguhan
-npm start
+cp .env.example .env    # isi key yang kamu punya (boleh kosong = demo)
+npm start               # http://localhost:3000
 ```
 
-Buka http://localhost:3000
+## 🔑 Menyambung AI sungguhan
 
-> Tanpa `ANTHROPIC_API_KEY`, aplikasi berjalan dalam **mode demo** dengan rencana contoh, jadi semua fitur (preview & unduh video) tetap bisa dicoba.
+Isi key di `.env` sesuai yang kamu miliki — tidak harus semua:
 
-## 🔑 Mengaktifkan AI
+| Provider | Dapatkan key di | Untuk |
+|----------|-----------------|-------|
+| Anthropic (Claude) | console.anthropic.com | chat, rencana video |
+| OpenAI (ChatGPT) | platform.openai.com | chat, generate gambar |
+| Google Gemini | aistudio.google.com | chat |
+| xAI (Grok) | console.x.ai | chat |
 
-1. Dapatkan API key dari https://console.anthropic.com
-2. Salin `.env.example` menjadi `.env`, isi `ANTHROPIC_API_KEY`.
-3. Jalankan ulang `npm start`. Badge di kanan atas akan menampilkan "AI aktif".
+Provider yang key-nya diisi otomatis "nyala" (badge ✓ di dropdown chat); sisanya tetap mode demo.
 
 ## 🧱 Arsitektur
 
-- **Backend** (`server.js`): Express + Anthropic SDK. Endpoint `POST /api/generate` meminta Claude membuat JSON terstruktur (dipaksa lewat JSON Schema). Ada fallback demo jika AI gagal / tanpa key.
-- **Frontend** (`public/`): merender tiap scene ke `<canvas>`, memutar TTS untuk voiceover, dan merekam kanvas (+musik) jadi video.
+- **Backend** (`server.js`): Express + adapter per provider.
+  - `POST /api/chat` — rute ke provider terpilih (Anthropic SDK / OpenAI / xAI / Gemini via fetch), fallback demo.
+  - `POST /api/prompt` — susun prompt gambar & image-to-video (pakai AI jika ada key, atau template demo).
+  - `POST /api/image` — text-to-image (OpenAI; demo = placeholder SVG).
+  - `POST /api/generate` — rencana video terstruktur via Claude (JSON Schema) + fallback demo.
+  - `GET /api/providers` — status konfigurasi tiap provider.
+- **Frontend** (`public/`): 4 tab; video dirender ke `<canvas>` dan direkam via MediaRecorder + WebAudio (musik latar), voiceover pakai TTS browser.
 
-## 📝 Catatan teknis
+## 📝 Batasan & langkah berikutnya
 
-- Voiceover TTS berbunyi saat **preview**. Karena browser tidak mengekspos audio TTS ke rekaman, **file video yang diunduh berisi visual + subtitle + musik latar** (bukan suara TTS). Ini keputusan sadar agar aplikasi bebas dari layanan berbayar.
-- Format keluaran `.webm` (VP9/VP8). Bisa dikonversi ke `.mp4` dengan tools seperti ffmpeg bila perlu.
-- Rendering & perekaman terjadi **sepenuhnya di sisi klien** — hemat biaya server dan menjaga privasi.
-
-## 🛣️ Pengembangan lanjutan (ide)
-
-- Sambungkan API text-to-video / TTS berkualitas (mis. untuk voiceover di dalam file).
-- Ekspor `.mp4` langsung di server via ffmpeg.
-- Upload gambar/footage sendiri sebagai latar scene.
-- Simpan riwayat rencana video.
+- **Studio video AI sungguhan (image-to-video seperti Veo/Runway/Sora)** belum tersambung — API-nya berbayar, sebagian perlu approval. Placeholder-nya sudah disiapkan; tinggal tambah adapter saat kamu punya aksesnya.
+- Voiceover TTS berbunyi saat preview; file video berisi visual + subtitle + musik latar.
+- Semua rendering video terjadi di sisi klien (hemat server, jaga privasi).
