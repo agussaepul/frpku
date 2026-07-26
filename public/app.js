@@ -24,6 +24,9 @@ fetch("/api/providers")
       o.textContent = c.label + (c.configured ? " ✓" : " (demo)");
       sel.appendChild(o);
     });
+    // Pilih otomatis provider pertama yang aktif (mis. Gemini).
+    const firstActive = p.chat.find((c) => c.configured);
+    if (firstActive) sel.value = firstActive.id;
   })
   .catch(() => {});
 

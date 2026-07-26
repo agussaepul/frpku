@@ -110,6 +110,8 @@ async function runChat(provider, messages) {
 //  STUDIO GAMBAR (text-to-image)
 // ============================================================
 
+const GEMINI_IMG_MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image-preview";
+
 async function imageOpenAI(prompt) {
   const r = await fetch("https://api.openai.com/v1/images/generations", {
     method: "POST",
@@ -120,6 +122,35 @@ async function imageOpenAI(prompt) {
   const data = await r.json();
   const b64 = data.data?.[0]?.b64_json;
   return `data:image/png;base64,${b64}`;
+}
+
+// Ambil gambar (inline_data) dari respons Gemini generateContent.
+function extractInlineImage(data) {
+  const parts = data.candidates?.[0]?.content?.parts || [];
+  const p = parts.find((x) => x.inlineData || x.inline_data);
+  const inline = p?.inlineData || p?.inline_data;
+  if (!inline?.data) throw new Error("Respons Gemini tidak berisi gambar");
+  return `data:${inline.mimeType || inline.mime_type || "image/png"};base64,${inline.data}`;
+}
+
+async function imageGemini(prompt) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_IMG_MODEL}:generateContent?key=${KEYS.gemini}`;
+  const r = await fetch(url, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseModalities: ["TEXT", "IMAGE"] } }),
+  });
+  if (!r.ok) throw new Error(`API ${r.status}: ${(await r.text()).slice(0, 150)}`);
+  return extractInlineImage(await r.json());
+}
+
+async function editGemini(b64, media, prompt) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_IMG_MODEL}:generateContent?key=${KEYS.gemini}`;
+  const r = await fetch(url, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ contents: [{ parts: [{ text: prompt || "Edit gambar ini" }, { inline_data: { mime_type: media, data: b64 } }] }], generationConfig: { responseModalities: ["TEXT", "IMAGE"] } }),
+  });
+  if (!r.ok) throw new Error(`API ${r.status}: ${(await r.text()).slice(0, 150)}`);
+  return extractInlineImage(await r.json());
 }
 
 // Placeholder gambar (SVG) untuk mode demo — hasil nyata & bisa dipakai jadi latar scene video.
@@ -143,9 +174,10 @@ function demoImage(prompt) {
   return "data:image/svg+xml;base64," + Buffer.from(svg).toString("base64");
 }
 
-async function runImage(prompt, provider = "openai") {
+async function runImage(prompt) {
   try {
-    if (provider === "openai" && KEYS.openai) return { url: await imageOpenAI(prompt), demo: false };
+    if (KEYS.gemini) return { url: await imageGemini(prompt), demo: false, provider: "gemini" };
+    if (KEYS.openai) return { url: await imageOpenAI(prompt), demo: false, provider: "openai" };
   } catch (err) {
     return { url: demoImage(prompt), demo: true, error: true, message: err.message };
   }
@@ -242,24 +274,29 @@ async function runAnalyze(b64, media) {
 //  IMAGE-TO-IMAGE (edit gambar dengan prompt) — OpenAI
 // ============================================================
 
+async function editOpenAI(b64, media, prompt) {
+  const buf = Buffer.from(b64, "base64");
+  const form = new FormData();
+  form.append("model", "gpt-image-1");
+  form.append("prompt", prompt);
+  form.append("size", "1024x1024");
+  form.append("image", new Blob([buf], { type: media }), "image.png");
+  const r = await fetch("https://api.openai.com/v1/images/edits", {
+    method: "POST", headers: { Authorization: `Bearer ${KEYS.openai}` }, body: form,
+  });
+  if (!r.ok) throw new Error(`API ${r.status}: ${(await r.text()).slice(0, 150)}`);
+  const data = await r.json();
+  return `data:image/png;base64,${data.data?.[0]?.b64_json}`;
+}
+
 async function runEdit(b64, media, prompt) {
-  if (!KEYS.openai) return { demo: true }; // frontend pakai filter kanvas
   try {
-    const buf = Buffer.from(b64, "base64");
-    const form = new FormData();
-    form.append("model", "gpt-image-1");
-    form.append("prompt", prompt);
-    form.append("size", "1024x1024");
-    form.append("image", new Blob([buf], { type: media }), "image.png");
-    const r = await fetch("https://api.openai.com/v1/images/edits", {
-      method: "POST", headers: { Authorization: `Bearer ${KEYS.openai}` }, body: form,
-    });
-    if (!r.ok) throw new Error(`API ${r.status}: ${(await r.text()).slice(0, 150)}`);
-    const data = await r.json();
-    return { url: `data:image/png;base64,${data.data?.[0]?.b64_json}`, demo: false };
+    if (KEYS.gemini) return { url: await editGemini(b64, media, prompt), demo: false };
+    if (KEYS.openai) return { url: await editOpenAI(b64, media, prompt), demo: false };
   } catch (err) {
     return { demo: true, error: err.message };
   }
+  return { demo: true }; // frontend pakai filter kanvas
 }
 
 // ============================================================
@@ -317,7 +354,7 @@ app.get("/api/providers", (_req, res) => {
   }));
   res.json({
     chat,
-    image: { configured: Boolean(KEYS.openai) },
+    image: { configured: Boolean(KEYS.openai || KEYS.gemini) },
     vision: { configured: Boolean(KEYS.anthropic || KEYS.openai || KEYS.gemini) },
     video: { configured: false }, // API image-to-video (Veo/Runway) belum disambung
     anyConfigured: Object.values(KEYS).some(Boolean),
@@ -373,29 +410,49 @@ app.post("/api/image", async (req, res) => {
   res.json(out);
 });
 
+function planPromptText({ topic, platform, language, tone, sceneCount }) {
+  return (
+    `Kamu content strategist video pendek. Buat rencana video untuk topik "${topic}". ` +
+    `Platform: ${platform}. Bahasa: ${language}. Tone: ${tone}. Jumlah scene: ${Math.min(Math.max(Number(sceneCount) || 4, 2), 8)}. ` +
+    `hook = 1 baris penghenti scroll. Tiap scene: onScreenText singkat, narration 1-2 kalimat, durationSeconds 3-6, backgroundColors 2 warna hex kontras. ` +
+    `Sertakan caption siap posting + 5-8 hashtags. ` +
+    `Jawab HANYA JSON dengan struktur persis: ` +
+    `{"title":"","hook":"","platform":"","caption":"","hashtags":[],"musicMood":"upbeat","scenes":[{"onScreenText":"","narration":"","durationSeconds":4,"backgroundColors":["#0f172a","#1e3a8a"]}]}`
+  );
+}
+
+async function planGemini(opts) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.gemini}:generateContent?key=${KEYS.gemini}`;
+  const r = await fetch(url, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ contents: [{ parts: [{ text: planPromptText(opts) }] }], generationConfig: { responseMimeType: "application/json" } }),
+  });
+  if (!r.ok) throw new Error(`API ${r.status}: ${(await r.text()).slice(0, 150)}`);
+  const txt = (await r.json()).candidates?.[0]?.content?.parts?.map((p) => p.text).join("") || "";
+  return JSON.parse(txt.replace(/```json|```/g, "").trim());
+}
+
 app.post("/api/generate", async (req, res) => {
   const { topic = "", platform = "TikTok / Reels", language = "Indonesia", tone = "santai & informatif", sceneCount = 4 } = req.body || {};
   if (!topic.trim()) return res.status(400).json({ error: "Topik tidak boleh kosong." });
-
-  if (!anthropic) return res.json({ plan: demoPlan({ topic, platform, language }) });
+  const opts = { topic, platform, language, tone, sceneCount };
 
   try {
-    const prompt =
-      `Kamu content strategist video pendek. Buat rencana video untuk topik "${topic}". ` +
-      `Platform: ${platform}. Bahasa: ${language}. Tone: ${tone}. Jumlah scene: ${Math.min(Math.max(Number(sceneCount) || 4, 2), 8)}. ` +
-      `hook = 1 baris penghenti scroll. Tiap scene: onScreenText singkat, narration 1-2 kalimat, durationSeconds 3-6, backgroundColors 2 warna hex kontras. ` +
-      `Sertakan caption siap posting + 5-8 hashtags.`;
-    const response = await anthropic.messages.create({
-      model: MODELS.anthropic, max_tokens: 4000,
-      output_config: { format: { type: "json_schema", schema: VIDEO_SCHEMA } },
-      messages: [{ role: "user", content: prompt }],
-    });
-    if (response.stop_reason === "refusal")
-      return res.status(422).json({ error: "Permintaan ditolak sistem keamanan AI." });
-    res.json({ plan: JSON.parse(response.content.find((b) => b.type === "text").text) });
+    if (anthropic) {
+      const response = await anthropic.messages.create({
+        model: MODELS.anthropic, max_tokens: 4000,
+        output_config: { format: { type: "json_schema", schema: VIDEO_SCHEMA } },
+        messages: [{ role: "user", content: planPromptText(opts) }],
+      });
+      if (response.stop_reason === "refusal")
+        return res.status(422).json({ error: "Permintaan ditolak sistem keamanan AI." });
+      return res.json({ plan: JSON.parse(response.content.find((b) => b.type === "text").text) });
+    }
+    if (KEYS.gemini) return res.json({ plan: await planGemini(opts) });
   } catch (err) {
-    res.json({ plan: demoPlan({ topic, platform, language }), warning: "AI bermasalah, memakai contoh. " + (err?.message || "") });
+    return res.json({ plan: demoPlan(opts), warning: "AI bermasalah, memakai contoh. " + (err?.message || "") });
   }
+  res.json({ plan: demoPlan(opts) });
 });
 
 // ---- util ----
