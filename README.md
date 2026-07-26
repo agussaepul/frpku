@@ -23,6 +23,22 @@ cp .env.example .env    # isi key yang kamu punya (boleh kosong = demo)
 npm start               # http://localhost:3000
 ```
 
+## ☁️ Deploy online gratis (biar bisa dibuka dari HP)
+
+`localhost:3000` hanya jalan di komputer yang menjalankan server. Untuk membuka dari HP kapan saja, deploy ke **Render.com** (gratis) langsung dari repo GitHub ini:
+
+1. Buka https://render.com → daftar/login (bisa pakai akun GitHub).
+2. **New +** → **Web Service** → **Build and deploy from a Git repository** → pilih repo `agussaepul/frpku`.
+3. Render otomatis membaca `render.yaml`. Pastikan:
+   - Build Command: `npm install`
+   - Start Command: `npm start`
+   - Instance Type: **Free**
+4. Klik **Create Web Service**. Tunggu build selesai (~1–2 menit).
+5. Kamu dapat URL publik seperti `https://ai-studio-hub-xxxx.onrender.com` — buka itu dari HP.
+
+> Opsional: tambahkan API key di menu **Environment** pada dashboard Render (`ANTHROPIC_API_KEY`, dll). Tanpa key tetap jalan mode demo.
+> Catatan free tier: layanan "tidur" setelah tak dipakai; buka pertama kali bisa loading ~30 detik.
+
 ## 🔑 Menyambung AI sungguhan
 
 Isi key di `.env` sesuai yang kamu miliki — tidak harus semua:

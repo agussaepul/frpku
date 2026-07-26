@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: ai-studio-hub
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      # Isi key di dashboard Render (Environment) — semua opsional, kosong = mode demo:
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: XAI_API_KEY
+        sync: false
