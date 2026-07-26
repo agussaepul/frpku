@@ -13,6 +13,9 @@
         <button class="tab active" data-tab="chat">💬 Chat</button>
         <button class="tab" data-tab="prompt">📝 Prompt</button>
         <button class="tab" data-tab="image">🖼️ Gambar</button>
+        <button class="tab" data-tab="edit">🎨 Ubah</button>
+        <button class="tab" data-tab="analyze">🔍 Analisa</button>
+        <button class="tab" data-tab="i2v">🎞️ Foto→Video</button>
         <button class="tab" data-tab="video">🎬 Video</button>
       </nav>
     </header>
@@ -78,6 +81,86 @@
           <div class="controls" id="imgActions" style="display:none">
             <a id="imgDownload" class="btnlink" download="gambar-ai.png">⬇️ Unduh gambar</a>
             <button id="imgToVideo" class="ghost">🎬 Jadikan latar video</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== UBAH (image-to-image) ========== -->
+      <section class="view" id="view-edit">
+        <div class="panel">
+          <h2>Ubah gambar (image-to-image)</h2>
+          <p class="hint">Unggah gambar, pilih gaya (atau tulis prompt), lalu ubah tampilannya.</p>
+          <input type="file" id="editFile" accept="image/*" />
+          <div class="style-row">
+            <button class="chip" data-style="sinematik">🎬 Sinematik</button>
+            <button class="chip" data-style="vintage">📷 Vintage</button>
+            <button class="chip" data-style="neon">🌈 Neon</button>
+            <button class="chip" data-style="bw">⚫ Hitam-Putih</button>
+            <button class="chip" data-style="hangat">🔥 Hangat</button>
+            <button class="chip" data-style="dingin">❄️ Dingin</button>
+          </div>
+          <label>Prompt (dipakai jika ada API key)
+            <input id="editPrompt" placeholder="Contoh: ubah jadi lukisan cat air" />
+          </label>
+          <p id="editMsg" class="msg"></p>
+          <div class="dual">
+            <div class="img-stage"><img id="editSrc" alt="asli" /><div class="stage-empty" id="editEmpty">Gambar asli</div></div>
+            <div class="img-stage"><img id="editOut" alt="hasil" /><div class="stage-empty">Hasil</div></div>
+          </div>
+          <div class="controls" id="editActions" style="display:none">
+            <a id="editDownload" class="btnlink" download="gambar-ubah.png">⬇️ Unduh hasil</a>
+            <button id="editToVideo" class="ghost">🎞️ Jadikan video</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== ANALISA (breakdown image) ========== -->
+      <section class="view" id="view-analyze">
+        <div class="panel">
+          <h2>Breakdown / analisa gambar</h2>
+          <p class="hint">Unggah gambar untuk dapat deskripsi, palet warna, dan prompt siap pakai.</p>
+          <input type="file" id="anaFile" accept="image/*" />
+          <p id="anaMsg" class="msg"></p>
+          <div class="img-stage" style="max-width:280px"><img id="anaImg" alt="gambar" /><div class="stage-empty" id="anaEmpty">Gambar</div></div>
+          <div id="anaOut" class="hidden">
+            <div class="prompt-card"><div class="prompt-card-head"><span>📄 Deskripsi</span></div><p id="anaDesc"></p></div>
+            <div class="prompt-card"><div class="prompt-card-head"><span>🎨 Palet warna</span></div><div id="anaPalette" class="palette"></div></div>
+            <div class="prompt-card"><div class="prompt-card-head"><span>🏷️ Elemen / mood</span></div><p id="anaElements"></p></div>
+            <div class="prompt-card"><div class="prompt-card-head"><span>🖼️ Prompt gambar</span><button class="ghost copy" data-target="anaImgPrompt">Salin</button></div><p id="anaImgPrompt"></p></div>
+            <div class="prompt-card"><div class="prompt-card-head"><span>🎥 Prompt video</span><button class="ghost copy" data-target="anaVidPrompt">Salin</button></div><p id="anaVidPrompt"></p></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ========== FOTO → VIDEO (image-to-video) ========== -->
+      <section class="view" id="view-i2v">
+        <div class="panel">
+          <h2>Foto → Video (image-to-video)</h2>
+          <p class="hint">Ubah satu foto jadi video bergerak (efek kamera) dan unduh sebagai .webm.</p>
+          <input type="file" id="i2vFile" accept="image/*" />
+          <div class="row">
+            <label>Gerakan
+              <select id="i2vMotion">
+                <option value="zoomin">Zoom in</option>
+                <option value="zoomout">Zoom out</option>
+                <option value="panright">Geser kanan</option>
+                <option value="panleft">Geser kiri</option>
+                <option value="kenburns">Ken Burns (zoom+geser)</option>
+              </select>
+            </label>
+            <label>Durasi (detik)
+              <input id="i2vDur" type="number" min="2" max="10" value="5" />
+            </label>
+          </div>
+          <label class="voice-toggle" style="margin-bottom:12px"><input type="checkbox" id="i2vMusic" checked /> pakai musik latar</label>
+          <p id="i2vMsg" class="msg"></p>
+          <div class="stage" style="aspect-ratio:1/1; max-height:360px">
+            <canvas id="i2vCanvas" width="1080" height="1080"></canvas>
+            <div id="i2vEmpty" class="stage-empty">Unggah foto dulu</div>
+          </div>
+          <div class="controls">
+            <button id="i2vPreview" disabled>▶️ Preview</button>
+            <button id="i2vRecord" disabled>⏺️ Buat & unduh video</button>
           </div>
         </div>
       </section>

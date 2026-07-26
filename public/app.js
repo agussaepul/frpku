@@ -331,6 +331,218 @@ $("copyCaption").addEventListener("click", async () => {
   catch { setMsg("Gagal menyalin.", "error"); }
 });
 
+// ================= HELPER GAMBAR =================
+function fileToImage(input) {
+  return new Promise((resolve, reject) => {
+    const f = input.files?.[0];
+    if (!f) return reject(new Error("Pilih file dulu"));
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => resolve({ img, dataUrl: reader.result, mediaType: f.type || "image/png" });
+      img.onerror = () => reject(new Error("Gagal memuat gambar"));
+      img.src = reader.result;
+    };
+    reader.onerror = () => reject(new Error("Gagal membaca file"));
+    reader.readAsDataURL(f);
+  });
+}
+function rgbToHex(r, g, b) { return "#" + [r, g, b].map((x) => x.toString(16).padStart(2, "0")).join(""); }
+
+// ================= UBAH (image-to-image) =================
+const STYLES = {
+  sinematik: { filter: "contrast(1.2) saturate(1.3) brightness(0.95)", overlay: "rgba(0,40,60,0.12)" },
+  vintage: { filter: "sepia(0.55) contrast(0.95) saturate(1.1) brightness(1.05)", overlay: "rgba(120,80,20,0.08)" },
+  neon: { filter: "saturate(2) contrast(1.25) brightness(1.05)", overlay: "rgba(120,0,160,0.10)" },
+  bw: { filter: "grayscale(1) contrast(1.15)", overlay: null },
+  hangat: { filter: "saturate(1.35) brightness(1.05)", overlay: "rgba(255,140,0,0.12)" },
+  dingin: { filter: "saturate(1.15) contrast(1.05)", overlay: "rgba(0,120,255,0.14)" },
+};
+let editState = null;
+$("editFile").addEventListener("change", async (e) => {
+  try {
+    editState = await fileToImage(e.target);
+    $("editSrc").src = editState.dataUrl; $("editSrc").style.display = "block"; $("editEmpty").style.display = "none";
+    setEditMsg("Pilih gaya di atas untuk mengubah.");
+  } catch (err) { setEditMsg(err.message, "error"); }
+});
+document.querySelectorAll(".chip").forEach((chip) => {
+  chip.addEventListener("click", async () => {
+    if (!editState) return setEditMsg("Unggah gambar dulu.", "error");
+    document.querySelectorAll(".chip").forEach((c) => c.classList.remove("active"));
+    chip.classList.add("active");
+    const prompt = $("editPrompt").value.trim();
+    if (providers?.image?.configured && prompt) {
+      setEditMsg("Mengubah dengan AI…");
+      try {
+        const res = await fetch("/api/edit", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ imageBase64: editState.dataUrl, mediaType: editState.mediaType, prompt }) });
+        const data = await res.json();
+        if (data.url) { showEditOut(data.url); return setEditMsg("Gambar diubah oleh AI!", "ok"); }
+      } catch {}
+    }
+    applyStyle(chip.dataset.style);
+    setEditMsg(providers?.image?.configured ? "Gaya diterapkan (isi prompt untuk hasil AI)." : "Gaya diterapkan (mode demo).");
+  });
+});
+function applyStyle(style) {
+  const { img } = editState;
+  const c = document.createElement("canvas");
+  c.width = img.naturalWidth; c.height = img.naturalHeight;
+  const cx = c.getContext("2d");
+  const s = STYLES[style] || STYLES.sinematik;
+  cx.filter = s.filter; cx.drawImage(img, 0, 0); cx.filter = "none";
+  if (s.overlay) { cx.fillStyle = s.overlay; cx.fillRect(0, 0, c.width, c.height); }
+  showEditOut(c.toDataURL("image/png"));
+}
+function showEditOut(url) {
+  $("editOut").src = url; $("editOut").style.display = "block";
+  $("editActions").style.display = "flex"; $("editDownload").href = url;
+  lastEditUrl = url;
+}
+let lastEditUrl = null;
+$("editToVideo").addEventListener("click", () => {
+  if (!lastEditUrl) return;
+  loadI2VImage(lastEditUrl);
+  document.querySelector('.tab[data-tab="i2v"]').click();
+});
+function setEditMsg(t, k = "") { const el = $("editMsg"); el.textContent = t; el.className = "msg " + k; }
+
+// ================= ANALISA (breakdown image) =================
+$("anaFile").addEventListener("change", async (e) => {
+  let st;
+  try { st = await fileToImage(e.target); } catch (err) { return setAnaMsg(err.message, "error"); }
+  $("anaImg").src = st.dataUrl; $("anaImg").style.display = "block"; $("anaEmpty").style.display = "none";
+  setAnaMsg("Menganalisa…");
+  if (providers?.vision?.configured) {
+    try {
+      const res = await fetch("/api/analyze", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ imageBase64: st.dataUrl, mediaType: st.mediaType }) });
+      const data = await res.json();
+      if (data.result) { fillAnalyze(data.result, analyzeLocal(st.img)); return setAnaMsg("Analisa AI selesai!", "ok"); }
+    } catch {}
+  }
+  const local = analyzeLocal(st.img);
+  fillAnalyze(localBreakdown(local), local);
+  setAnaMsg("Analisa demo (palet & komposisi asli dari gambarmu).");
+});
+function analyzeLocal(img) {
+  const S = 64, c = document.createElement("canvas"); c.width = S; c.height = S;
+  const cx = c.getContext("2d"); cx.drawImage(img, 0, 0, S, S);
+  const d = cx.getImageData(0, 0, S, S).data;
+  const buckets = {}; let br = 0;
+  for (let i = 0; i < d.length; i += 4) {
+    const r = d[i], g = d[i + 1], b = d[i + 2]; br += (r + g + b) / 3;
+    const key = `${r >> 5},${g >> 5},${b >> 5}`;
+    (buckets[key] ||= { c: 0, r: 0, g: 0, b: 0 });
+    const bb = buckets[key]; bb.c++; bb.r += r; bb.g += g; bb.b += b;
+  }
+  br /= d.length / 4;
+  const palette = Object.values(buckets).sort((a, b) => b.c - a.c).slice(0, 5)
+    .map((b) => rgbToHex(Math.round(b.r / b.c), Math.round(b.g / b.c), Math.round(b.b / b.c)));
+  const brightness = br > 170 ? "terang" : br < 85 ? "gelap" : "sedang";
+  const orient = img.naturalWidth > img.naturalHeight ? "landscape" : img.naturalWidth < img.naturalHeight ? "potret" : "persegi";
+  return { palette, brightness, orient };
+}
+function localBreakdown(l) {
+  return {
+    description: `Gambar ${l.orient} dengan nuansa ${l.brightness}. Didominasi palet warna ${l.palette.slice(0, 3).join(", ")}.`,
+    elements: [l.orient, `pencahayaan ${l.brightness}`, "komposisi utama di tengah"],
+    mood: l.brightness === "gelap" ? "dramatis / moody" : l.brightness === "terang" ? "cerah / ceria" : "netral",
+    imagePrompt: `A ${l.orient} image, ${l.brightness} lighting, color palette ${l.palette.slice(0, 3).join(", ")}, cinematic, highly detailed, 8k`,
+    videoPrompt: `Animate this image with a slow push-in and gentle parallax, cinematic camera move, 5 seconds, smooth motion`,
+  };
+}
+function fillAnalyze(r, local) {
+  $("anaDesc").textContent = r.description || "-";
+  $("anaElements").textContent = ((r.elements || []).join(", ")) + (r.mood ? ` · mood: ${r.mood}` : "");
+  $("anaImgPrompt").textContent = r.imagePrompt || "";
+  $("anaVidPrompt").textContent = r.videoPrompt || "";
+  const pal = $("anaPalette"); pal.innerHTML = "";
+  (local.palette || []).forEach((hex) => {
+    const sw = document.createElement("div"); sw.className = "sw"; sw.style.background = hex;
+    const s = document.createElement("span"); s.textContent = hex; sw.appendChild(s); pal.appendChild(sw);
+  });
+  $("anaOut").classList.remove("hidden");
+}
+function setAnaMsg(t, k = "") { const el = $("anaMsg"); el.textContent = t; el.className = "msg " + k; }
+
+// ================= FOTO → VIDEO (image-to-video) =================
+const i2vCanvas = $("i2vCanvas");
+const i2vCtx = i2vCanvas.getContext("2d");
+let i2vState = null, i2vBusy = false;
+
+$("i2vFile").addEventListener("change", async (e) => {
+  try {
+    i2vState = await fileToImage(e.target);
+    $("i2vEmpty").style.display = "none"; i2vCanvas.style.display = "block";
+    drawI2V(i2vState.img, 0, $("i2vMotion").value);
+    $("i2vPreview").disabled = false; $("i2vRecord").disabled = false;
+    setI2VMsg("Siap. Pilih gerakan lalu preview / buat video.");
+  } catch (err) { setI2VMsg(err.message, "error"); }
+});
+function loadI2VImage(url) {
+  const img = new Image();
+  img.onload = () => {
+    i2vState = { img, dataUrl: url, mediaType: "image/png" };
+    $("i2vEmpty").style.display = "none"; i2vCanvas.style.display = "block";
+    drawI2V(img, 0, $("i2vMotion").value);
+    $("i2vPreview").disabled = false; $("i2vRecord").disabled = false;
+    setI2VMsg("Gambar dari tab lain dimuat. Buat videonya!");
+  };
+  img.src = url;
+}
+function drawI2V(img, p, motion) {
+  const w = i2vCanvas.width, h = i2vCanvas.height;
+  const cover = Math.max(w / img.naturalWidth, h / img.naturalHeight);
+  let scale = cover;
+  if (motion === "zoomin" || motion === "kenburns") scale = cover * (1 + 0.22 * p);
+  else if (motion === "zoomout") scale = cover * (1 + 0.22 * (1 - p));
+  else scale = cover * 1.18;
+  const iw = img.naturalWidth * scale, ih = img.naturalHeight * scale;
+  const slackX = iw - w, slackY = ih - h;
+  let ox = -slackX / 2, oy = -slackY / 2;
+  if (motion === "panright") ox = -slackX * p;
+  else if (motion === "panleft") ox = -slackX * (1 - p);
+  else if (motion === "kenburns") ox = -slackX * (0.5 * p);
+  i2vCtx.fillStyle = "#000"; i2vCtx.fillRect(0, 0, w, h);
+  i2vCtx.drawImage(img, ox, oy, iw, ih);
+}
+$("i2vMotion").addEventListener("change", () => i2vState && drawI2V(i2vState.img, 0, $("i2vMotion").value));
+$("i2vPreview").addEventListener("click", () => !i2vBusy && runI2V({ record: false }));
+$("i2vRecord").addEventListener("click", () => !i2vBusy && runI2V({ record: true }));
+
+async function runI2V({ record }) {
+  if (!i2vState) return;
+  i2vBusy = true; setI2VControls(false);
+  const dur = Math.min(Math.max(Number($("i2vDur").value) || 5, 2), 10);
+  const motion = $("i2vMotion").value;
+  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  const dest = audioCtx.createMediaStreamDestination();
+  let recorder, chunks = [];
+  if (record) {
+    const stream = i2vCanvas.captureStream(30);
+    if ($("i2vMusic").checked) { startMusic(audioCtx, dest, "chill"); dest.stream.getAudioTracks().forEach((t) => stream.addTrack(t)); }
+    const mime = pickMime();
+    recorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+    recorder.ondataavailable = (e) => e.data.size && chunks.push(e.data);
+    recorder.start(); setI2VMsg("⏺️ Merekam video…");
+  } else setI2VMsg("▶️ Preview…");
+  const start = performance.now();
+  await new Promise((res) => {
+    function frame(now) { const t = (now - start) / 1000; drawI2V(i2vState.img, Math.min(t / dur, 1), motion); if (t >= dur) return res(); requestAnimationFrame(frame); }
+    requestAnimationFrame(frame);
+  });
+  if (record) {
+    await new Promise((r) => { recorder.onstop = r; recorder.stop(); });
+    const blob = new Blob(chunks, { type: chunks[0]?.type || "video/webm" });
+    downloadBlob(blob, "foto-video.webm");
+    setI2VMsg("✅ Video selesai & terunduh (.webm).", "ok");
+  } else setI2VMsg("Preview selesai.");
+  try { audioCtx.close(); } catch {}
+  i2vBusy = false; setI2VControls(true);
+}
+function setI2VControls(e) { $("i2vPreview").disabled = !e || !i2vState; $("i2vRecord").disabled = !e || !i2vState; }
+function setI2VMsg(t, k = "") { const el = $("i2vMsg"); el.textContent = t; el.className = "msg " + k; }
+
 // ---- util bersama ----
 function clampDur(d) { return Math.min(Math.max(Number(d) || 4, 2), 8); }
 function wrapText(text, x, y, maxWidth, lineHeight) {

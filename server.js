@@ -171,6 +171,98 @@ function demoPrompts(idea) {
 }
 
 // ============================================================
+//  BREAKDOWN / ANALISA GAMBAR (vision → deskripsi + prompt)
+//  base64 tanpa prefix "data:...," ; media_type mis. image/png
+// ============================================================
+
+const VISION_INSTRUCTION =
+  `Analisa gambar ini. Jawab HANYA JSON dengan kunci: ` +
+  `description (deskripsi isi gambar, 1-2 kalimat), ` +
+  `elements (array kata kunci objek/elemen penting), ` +
+  `mood (suasana), ` +
+  `imagePrompt (prompt bahasa Inggris untuk membuat ulang gambar serupa), ` +
+  `videoPrompt (prompt image-to-video: gerakan kamera & animasi yang cocok). Tanpa teks lain.`;
+
+async function analyzeAnthropic(b64, media) {
+  const res = await anthropic.messages.create({
+    model: MODELS.anthropic, max_tokens: 1000,
+    messages: [{ role: "user", content: [
+      { type: "image", source: { type: "base64", media_type: media, data: b64 } },
+      { type: "text", text: VISION_INSTRUCTION },
+    ] }],
+  });
+  return res.content.find((b) => b.type === "text")?.text || "";
+}
+
+async function analyzeOpenAI(b64, media) {
+  const r = await fetch("https://api.openai.com/v1/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${KEYS.openai}` },
+    body: JSON.stringify({
+      model: MODELS.openai, max_tokens: 1000,
+      messages: [{ role: "user", content: [
+        { type: "text", text: VISION_INSTRUCTION },
+        { type: "image_url", image_url: { url: `data:${media};base64,${b64}` } },
+      ] }],
+    }),
+  });
+  if (!r.ok) throw new Error(`API ${r.status}`);
+  return (await r.json()).choices?.[0]?.message?.content || "";
+}
+
+async function analyzeGemini(b64, media) {
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.gemini}:generateContent?key=${KEYS.gemini}`;
+  const r = await fetch(url, {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ contents: [{ parts: [
+      { text: VISION_INSTRUCTION },
+      { inline_data: { mime_type: media, data: b64 } },
+    ] }] }),
+  });
+  if (!r.ok) throw new Error(`API ${r.status}`);
+  return (await r.json()).candidates?.[0]?.content?.parts?.map((p) => p.text).join("") || "";
+}
+
+async function runAnalyze(b64, media) {
+  const provider = anthropic ? "anthropic" : KEYS.openai ? "openai" : KEYS.gemini ? "gemini" : null;
+  if (!provider) return { demo: true }; // frontend akan analisa warna sendiri
+  try {
+    const raw =
+      provider === "anthropic" ? await analyzeAnthropic(b64, media) :
+      provider === "openai" ? await analyzeOpenAI(b64, media) :
+      await analyzeGemini(b64, media);
+    const json = JSON.parse(raw.replace(/```json|```/g, "").trim());
+    return { result: json, demo: false, provider };
+  } catch (err) {
+    return { demo: true, error: err.message };
+  }
+}
+
+// ============================================================
+//  IMAGE-TO-IMAGE (edit gambar dengan prompt) — OpenAI
+// ============================================================
+
+async function runEdit(b64, media, prompt) {
+  if (!KEYS.openai) return { demo: true }; // frontend pakai filter kanvas
+  try {
+    const buf = Buffer.from(b64, "base64");
+    const form = new FormData();
+    form.append("model", "gpt-image-1");
+    form.append("prompt", prompt);
+    form.append("size", "1024x1024");
+    form.append("image", new Blob([buf], { type: media }), "image.png");
+    const r = await fetch("https://api.openai.com/v1/images/edits", {
+      method: "POST", headers: { Authorization: `Bearer ${KEYS.openai}` }, body: form,
+    });
+    if (!r.ok) throw new Error(`API ${r.status}: ${(await r.text()).slice(0, 150)}`);
+    const data = await r.json();
+    return { url: `data:image/png;base64,${data.data?.[0]?.b64_json}`, demo: false };
+  } catch (err) {
+    return { demo: true, error: err.message };
+  }
+}
+
+// ============================================================
 //  RENCANA VIDEO (fitur asli — dari topik jadi scene)
 // ============================================================
 
@@ -226,9 +318,22 @@ app.get("/api/providers", (_req, res) => {
   res.json({
     chat,
     image: { configured: Boolean(KEYS.openai) },
+    vision: { configured: Boolean(KEYS.anthropic || KEYS.openai || KEYS.gemini) },
     video: { configured: false }, // API image-to-video (Veo/Runway) belum disambung
     anyConfigured: Object.values(KEYS).some(Boolean),
   });
+});
+
+app.post("/api/analyze", async (req, res) => {
+  const { imageBase64 = "", mediaType = "image/png" } = req.body || {};
+  if (!imageBase64) return res.status(400).json({ error: "Gambar kosong." });
+  res.json(await runAnalyze(imageBase64.replace(/^data:[^,]+,/, ""), mediaType));
+});
+
+app.post("/api/edit", async (req, res) => {
+  const { imageBase64 = "", mediaType = "image/png", prompt = "" } = req.body || {};
+  if (!imageBase64) return res.status(400).json({ error: "Gambar kosong." });
+  res.json(await runEdit(imageBase64.replace(/^data:[^,]+,/, ""), mediaType, prompt));
 });
 
 app.post("/api/chat", async (req, res) => {
