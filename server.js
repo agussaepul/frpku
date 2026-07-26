@@ -297,8 +297,13 @@ app.post("/api/generate", async (req, res) => {
 function hashStr(s) { let h = 0; for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0; return h; }
 function escapeXml(s) { return String(s).replace(/[<>&'"]/g, (c) => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", "'": "&apos;", '"': "&quot;" }[c])); }
 
-app.listen(PORT, () => {
-  const active = Object.entries(KEYS).filter(([, v]) => v).map(([k]) => PROVIDER_LABELS[k]);
-  console.log(`AI Studio Hub jalan di http://localhost:${PORT}`);
-  console.log(active.length ? `Provider aktif: ${active.join(", ")}` : "Semua provider mode demo (isi key di .env untuk aktifkan)");
-});
+// Jalankan server lokal (npm start). Di Vercel, app diekspor sebagai handler.
+if (!process.env.VERCEL) {
+  app.listen(PORT, () => {
+    const active = Object.entries(KEYS).filter(([, v]) => v).map(([k]) => PROVIDER_LABELS[k]);
+    console.log(`AI Studio Hub jalan di http://localhost:${PORT}`);
+    console.log(active.length ? `Provider aktif: ${active.join(", ")}` : "Semua provider mode demo (isi key di .env untuk aktifkan)");
+  });
+}
+
+export default app;

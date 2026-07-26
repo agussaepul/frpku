@@ -23,7 +23,25 @@ cp .env.example .env    # isi key yang kamu punya (boleh kosong = demo)
 npm start               # http://localhost:3000
 ```
 
-## ☁️ Deploy online gratis (biar bisa dibuka dari HP)
+## ☁️ Deploy GRATIS tanpa kartu (Vercel) — direkomendasikan
+
+Render sekarang minta kartu. **Vercel gratis dan tanpa kartu.** Repo ini sudah disiapkan (`vercel.json` + `api/index.js`):
+
+1. (Sekali) Merge **PR #1** ke `main` di GitHub — biar Vercel deploy dari `main`.
+2. Buka https://vercel.com → **Sign Up** pakai akun **GitHub** (gratis, tanpa kartu).
+3. **Add New… → Project** → **Import** repo `agussaepul/frpku`.
+4. Biarkan setelan default (Vercel baca `vercel.json` otomatis) → **Deploy**.
+5. Tunggu ~1 menit → dapat URL `https://frpku-xxxx.vercel.app` → buka dari HP.
+
+Menambah API key nanti: Vercel → project → **Settings → Environment Variables** → tambah `ANTHROPIC_API_KEY` dll → **Redeploy**.
+
+### Alternatif 100% gratis lain
+- **Netlify** (mirip Vercel, tanpa kartu).
+- **Termux** (jalan langsung di HP): install Termux → `pkg install nodejs git -y` → `git clone` repo → `npm install` → `npm start` → buka `localhost:3000` di HP. Cocok kalau mau tanpa akun apa pun.
+
+---
+
+## ☁️ Deploy via Render (butuh kartu untuk verifikasi)
 
 `localhost:3000` hanya jalan di komputer yang menjalankan server. Untuk membuka dari HP kapan saja, deploy ke **Render.com** (gratis) langsung dari repo GitHub ini:
 
