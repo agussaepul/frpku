@@ -63,20 +63,37 @@ async function chatOpenAICompatible({ base, key, model, messages }) {
   return data.choices?.[0]?.message?.content || "";
 }
 
+// Daftar model teks Gemini yang dicoba berurutan. Kalau model pilihan kena
+// kuota (429) atau tidak ada (404), otomatis mundur ke model gratis berikutnya.
+function geminiTextModels() {
+  return [...new Set([MODELS.gemini, "gemini-2.5-flash", "gemini-2.0-flash"])];
+}
+
+// Coba beberapa model sampai ada yang berhasil. Lempar error terakhir kalau semua gagal.
+async function geminiTry(models, body) {
+  let lastErr = "Gemini gagal";
+  for (const model of models) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${KEYS.gemini}`;
+    const r = await fetch(url, {
+      method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body),
+    });
+    if (r.ok) return await r.json();
+    lastErr = `API ${r.status}: ${(await r.text()).slice(0, 150)}`;
+    if (r.status !== 429 && r.status !== 404) break; // error lain: berhenti
+  }
+  throw new Error(lastErr);
+}
+
+function geminiText(data) {
+  return data.candidates?.[0]?.content?.parts?.map((p) => p.text).join("") || "";
+}
+
 async function chatGemini(messages) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.gemini}:generateContent?key=${KEYS.gemini}`;
   const contents = messages.map((m) => ({
     role: m.role === "assistant" ? "model" : "user",
     parts: [{ text: m.content }],
   }));
-  const r = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ contents }),
-  });
-  if (!r.ok) throw new Error(`API ${r.status}: ${(await r.text()).slice(0, 200)}`);
-  const data = await r.json();
-  return data.candidates?.[0]?.content?.parts?.map((p) => p.text).join("") || "";
+  return geminiText(await geminiTry(geminiTextModels(), { contents }));
 }
 
 function demoChat(provider, messages) {
@@ -110,7 +127,12 @@ async function runChat(provider, messages) {
 //  STUDIO GAMBAR (text-to-image)
 // ============================================================
 
-const GEMINI_IMG_MODEL = process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image-preview";
+function geminiImageModels() {
+  return [...new Set([
+    process.env.GEMINI_IMAGE_MODEL || "gemini-2.5-flash-image-preview",
+    "gemini-2.0-flash-preview-image-generation",
+  ])];
+}
 
 async function imageOpenAI(prompt) {
   const r = await fetch("https://api.openai.com/v1/images/generations", {
@@ -134,23 +156,17 @@ function extractInlineImage(data) {
 }
 
 async function imageGemini(prompt) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_IMG_MODEL}:generateContent?key=${KEYS.gemini}`;
-  const r = await fetch(url, {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }], generationConfig: { responseModalities: ["TEXT", "IMAGE"] } }),
-  });
-  if (!r.ok) throw new Error(`API ${r.status}: ${(await r.text()).slice(0, 150)}`);
-  return extractInlineImage(await r.json());
+  return extractInlineImage(await geminiTry(geminiImageModels(), {
+    contents: [{ parts: [{ text: prompt }] }],
+    generationConfig: { responseModalities: ["TEXT", "IMAGE"] },
+  }));
 }
 
 async function editGemini(b64, media, prompt) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_IMG_MODEL}:generateContent?key=${KEYS.gemini}`;
-  const r = await fetch(url, {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ contents: [{ parts: [{ text: prompt || "Edit gambar ini" }, { inline_data: { mime_type: media, data: b64 } }] }], generationConfig: { responseModalities: ["TEXT", "IMAGE"] } }),
-  });
-  if (!r.ok) throw new Error(`API ${r.status}: ${(await r.text()).slice(0, 150)}`);
-  return extractInlineImage(await r.json());
+  return extractInlineImage(await geminiTry(geminiImageModels(), {
+    contents: [{ parts: [{ text: prompt || "Edit gambar ini" }, { inline_data: { mime_type: media, data: b64 } }] }],
+    generationConfig: { responseModalities: ["TEXT", "IMAGE"] },
+  }));
 }
 
 // Placeholder gambar (SVG) untuk mode demo — hasil nyata & bisa dipakai jadi latar scene video.
@@ -243,16 +259,9 @@ async function analyzeOpenAI(b64, media) {
 }
 
 async function analyzeGemini(b64, media) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.gemini}:generateContent?key=${KEYS.gemini}`;
-  const r = await fetch(url, {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ contents: [{ parts: [
-      { text: VISION_INSTRUCTION },
-      { inline_data: { mime_type: media, data: b64 } },
-    ] }] }),
-  });
-  if (!r.ok) throw new Error(`API ${r.status}`);
-  return (await r.json()).candidates?.[0]?.content?.parts?.map((p) => p.text).join("") || "";
+  return geminiText(await geminiTry(geminiTextModels(), {
+    contents: [{ parts: [{ text: VISION_INSTRUCTION }, { inline_data: { mime_type: media, data: b64 } }] }],
+  }));
 }
 
 async function runAnalyze(b64, media) {
@@ -422,14 +431,11 @@ function planPromptText({ topic, platform, language, tone, sceneCount }) {
 }
 
 async function planGemini(opts) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${MODELS.gemini}:generateContent?key=${KEYS.gemini}`;
-  const r = await fetch(url, {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ contents: [{ parts: [{ text: planPromptText(opts) }] }], generationConfig: { responseMimeType: "application/json" } }),
+  const data = await geminiTry(geminiTextModels(), {
+    contents: [{ parts: [{ text: planPromptText(opts) }] }],
+    generationConfig: { responseMimeType: "application/json" },
   });
-  if (!r.ok) throw new Error(`API ${r.status}: ${(await r.text()).slice(0, 150)}`);
-  const txt = (await r.json()).candidates?.[0]?.content?.parts?.map((p) => p.text).join("") || "";
-  return JSON.parse(txt.replace(/```json|```/g, "").trim());
+  return JSON.parse(geminiText(data).replace(/```json|```/g, "").trim());
 }
 
 app.post("/api/generate", async (req, res) => {
